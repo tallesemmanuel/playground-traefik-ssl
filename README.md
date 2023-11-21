@@ -106,3 +106,93 @@ To test locally, you can get the IP of the kind container and the port that the 
 ```
 
 Everything is fine, as we don't have any applications yet.
+
+## Now we will play by creating a web server with Nginx
+
+We have two kubernetes manifests created, one is the deployment and the other is the service, used to expose the service.
+
+Let's start deployment and service.
+
+```sh
+kubectl create -f deployment.yml
+kubectl create -f service.yml
+```
+
+Now, you can check the services that have been uploaded with the command:
+
+```sh
+kubectl get all
+```
+
+Command output
+
+```sh
+➜  playground-traefik-ssl git:(main) ✗ kubectl get all
+NAME                         READY   STATUS    RESTARTS   AGE
+pod/nginx-79dfddc6bf-mk6jf   1/1     Running   0          8s
+
+NAME                 TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1     <none>        443/TCP   81m
+service/nginx        ClusterIP   10.96.84.99   <none>        80/TCP    5s
+
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx   1/1     1            1           8s
+
+NAME                               DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-79dfddc6bf   1         1         1       8s
+```
+
+Notice that the services have increased steadily.
+
+Now let's make a route to access our web server. Enter the following command.
+
+```sh
+kubectl port-forward service/nginx 8080:80
+```
+
+Command output
+
+```sh
+➜  playground-traefik-ssl git:(main) ✗ kubectl port-forward service/nginx 8080:80
+Forwarding from 127.0.0.1:8080 -> 80
+Forwarding from [::1]:8080 -> 80
+```
+
+We did a port forward, exposing the nginx service created on port 8080 from outside and 80 from inside the application.
+
+Now, type localhost:8080 in the terminal or browser and see the result. I will do it in the terminal with curl.
+
+```sh
+curl localhost:8080
+```
+
+Command output
+
+```sh
+➜  playground-traefik-ssl git:(main) ✗ curl localhost:8080
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+Perfect!!! Now we can play more!
