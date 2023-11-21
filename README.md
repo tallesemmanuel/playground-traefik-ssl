@@ -98,4 +98,11 @@ replicaset.apps/traefik-756b58d769   1         1         1       59s
 Note that in external ip it is pending, as we are using kind, we do not have a public ip. We will test everything internally.
 
 
+To test locally, you can get the IP of the kind container and the port that the traefik service delivers, in this case port 31575.
 
+```sh
+➜  playground-traefik-ssl git:(main) curl http://172.18.0.2:31575/
+404 page not found
+```
+
+Everything is fine, as we don't have any applications yet.
