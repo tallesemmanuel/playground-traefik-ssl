@@ -114,8 +114,8 @@ We have two kubernetes manifests created, one is the deployment and the other is
 Let's start deployment and service.
 
 ```sh
-kubectl create -f deployment.yml
-kubectl create -f service.yml
+kubectl create -f k8s/deployment.yml
+kubectl create -f k8s/service.yml
 ```
 
 Now, you can check the services that have been uploaded with the command:
@@ -196,3 +196,177 @@ Commercial support is available at
 ```
 
 Perfect!!! Now we can play more!
+
+### Before continuing, a note.
+
+From here, I validated on a cluster on Google Cloud using GKE and had a domain also hosted on Google Cloud. So I needed to get the IP that traefik provided and pointed the traefik and dashboard domains to the same IP.
+
+## Adding routes
+
+Until then, we have added a port-forward to access, now we will actually use Traefik and create a route.
+
+See k8s/ingressroute.yml, the content of the manifest.
+
+```sh
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ingressroute
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`traefik.devopsrn.shop`)
+    kind: Rule
+    services:
+    - name: nginx
+      port: 80
+```
+
+Note that we use the IngressRoute type from Traefik apiVersion. We created a route, which goes from the match on the host **traefik.devopsrn.shop** and using the Nginx service, which we already uploaded before, on port 80.
+
+To run this guy, type:
+
+```sh
+kubectl create -f k8s/ingressroute.yml
+```
+
+If we have already uploaded the deployment, service and ingressroute, then our application is up and running, responding to the domain that we put in the manifest.
+```sh
+curl http://traefik.devopsrn.shop
+```
+
+Command output
+
+```sh
+➜  playground-traefik-ssl git:(main) ✗ curl http://traefik.devopsrn.shop
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+Another thing we can do is use Middleware. These are adjustments to requests before they are sent to the service, like a **ratelimit**, which is what we are going to do.
+
+Let's create the middleware kubernetes manifest.
+
+```sh
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: ratelimit
+spec:
+  rateLimit:
+    average: 5
+    period: 1s
+```
+
+Para cria-lo.
+
+```sh
+kubectl create -f k8s/middleware
+```
+
+Also adjust the ingressroute manifest to add the middleware.
+
+```sh
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ingressroute
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`traefik.devopsrn.shop`)
+    kind: Rule
+    services:
+    - name: nginx
+      port: 80
+    middlewares:
+      - name: ratelimit
+```
+
+Restart the ingressroute to recognize the middleware ratelimit.
+
+```sh
+kubectl apply -f k8s/ingressroute.yml
+```
+
+Let's test a load of requests using fortio, a simple container for validation.
+
+```sh
+docker container run fortio/fortio load http://traefik.devopsrn.shop
+```
+
+Command output
+
+```sh
+➜  playground-traefik-ssl git:(main) ✗ docker container run fortio/fortio load http://traefik.devopsrn.shop
+{"ts":1701202059.434885,"level":"info","r":1,"file":"scli.go","line":124,"msg":"Starting","command":"Φορτίο","version":"1.62.1 h1:skiMLNOoW7504y/pKBhMgxvS/LKiQKeQq5RSCpCxzQY= go1.21.4 amd64 linux","go-max-procs":12}
+Fortio 1.62.1 running at 8 queries per second, 12->12 procs, for 5s: http://traefik.devopsrn.shop
+{"ts":1701202059.435351,"level":"info","r":1,"file":"httprunner.go","line":121,"msg":"Starting http test","run":0,"url":"http://traefik.devopsrn.shop","threads":4,"qps":"8.0","warmup":"parallel","conn-reuse":""}
+{"ts":1701202060.601865,"level":"warn","r":42,"file":"http_client.go","line":1104,"msg":"Non ok http code","code":429,"status":"HTTP/1.1 429","thread":3,"run":0}
+{"ts":1701202060.602555,"level":"warn","r":41,"file":"http_client.go","line":1104,"msg":"Non ok http code","code":429,"status":"HTTP/1.1 429","thread":2,"run":0}
+Aborting because of error 429 for http://traefik.devopsrn.shop (191 bytes)
+```
+
+See that the http error 492 appeared, which is due to many requests.
+
+
+## Dashboard Traefik
+
+Now, let's add the Traefik dashboard.
+
+Create a manifest called dashboard-traefik.yml in the k8s directory.
+
+```sh
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dashboard
+  namespace: traefik-system
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`dashboard.devopsrn.shop`)
+    kind: Rule
+    services:
+      - name: api@internal
+        kind: TraefikService
+```
+
+Create this content and create the manifest on the cluster.
+
+```sh
+kubectl create -f k8s/dashboard-traefik.yml
+```
+
+Command output
+
+```sh
+➜  playground-traefik-ssl git:(main) ✗ curl http://dashboard.devopsrn.shop/
+<a href="/dashboard/">Found</a>.
+```
+
+See that he created the dashboard.

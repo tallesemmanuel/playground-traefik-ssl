@@ -1,0 +1,15 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ingressroute
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`traefik.devopsrn.shop`)
+    kind: Rule
+    services:
+    - name: nginx
+      port: 80
+    middlewares:
+      - name: ratelimit
